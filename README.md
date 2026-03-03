@@ -1,23 +1,26 @@
 
 # Robotic Arm Trajectory Control
 
+[![MATLAB](https://img.shields.io/badge/MATLAB-R2023b+-orange?logo=mathworks&logoColor=white)](https://www.mathworks.com/)
+[![ROS2](https://img.shields.io/badge/ROS2-Humble-blue?logo=ros&logoColor=white)](https://docs.ros.org/en/humble/)
+[![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python&logoColor=white)](https://www.python.org/)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+
 A MATLAB + ROS2 pipeline for controlling a **6-DOF robotic arm** to autonomously execute custom end-effector trajectories using screw-theory-based kinematics, trapezoidal velocity profiling, and image-to-path conversion.
-
-
-![IMG_0093](https://github.com/user-attachments/assets/0b7f7970-f63b-44d8-a445-03f283068bc2)
-
-![IMG_0095](https://github.com/user-attachments/assets/c37b4a65-cec6-4e4c-952a-15d80a2b6adb)
 
 ---
 
 ## 📋 Table of Contents
 
 - [Overview](#overview)
+- [Demo](#demo)
+- [Quickstart](#quickstart)
 - [System Architecture](#system-architecture)
 - [Pipeline](#pipeline)
 - [Key Algorithms](#key-algorithms)
 - [MATLAB Modules](#matlab-modules)
 - [ROS2 Integration](#ros2-integration)
+- [Results](#results)
 - [Project Structure](#project-structure)
 - [Dependencies](#dependencies)
 
@@ -25,7 +28,7 @@ A MATLAB + ROS2 pipeline for controlling a **6-DOF robotic arm** to autonomously
 
 ## Overview
 
-This project implements end-to-end trajectory control for a 6-DOF robotic arm. As a demonstration, the robot autonomously draws a custom signature/logo — but the pipeline is fully general and supports any 2D or 3D end-effector path.
+This project implements end-to-end trajectory control for a 6-DOF robotic arm, with the primary goal of **drawing 3D light projections in mid-air using an LED end-effector**. The robot autonomously traces any image or signature as a luminous path through space — captured by long-exposure photography to reveal the full 3D projection. As a demonstration, the robot draws a custom signature/logo, but the pipeline is fully general and supports any 2D or 3D end-effector path.
 
 The system:
 
@@ -38,7 +41,87 @@ The system:
 
 ---
 
+## Demo
+
+The robot arm traces a custom signature in 3D space with an LED end-effector. The light path is captured via long-exposure photography, revealing the full trajectory as a glowing projection.
+
+### Live Execution
+
+![Demo GIF](demo.gif)
+
+### Long-Exposure Light Projections
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/0b7f7970-f63b-44d8-a445-03f283068bc2" width="48%" alt="3D Light Projection — circular logo"/>
+  &nbsp;
+  <img src="https://github.com/user-attachments/assets/c37b4a65-cec6-4e4c-952a-15d80a2b6adb" width="48%" alt="3D Light Projection — script signature"/>
+</p>
+
+> Long-exposure captures of the LED end-effector tracing the "PGery" signature trajectory in mid-air.
+
+---
+
+## Quickstart
+
+### Prerequisites
+
+- MATLAB R2023b+ with Image Processing Toolbox and Control System Toolbox
+- ROS2 Humble (Ubuntu 22.04)
+- Python 3.10+
+- A ROS2-compatible 6-DOF robot arm (tested on UR5)
+
+### 1 — Generate the Trajectory in MATLAB
+
+```matlab
+% Step 1: Convert your image to robot-frame paths
+run('MATLAB/Image2Coordinates.m')
+% → outputs: final_scaled_paths (cell array, meters)
+
+% Step 2: Plan the trajectory and run IK
+% For 2D (flat surface):
+run('MATLAB/Bonous_constantV.m')
+
+% For 3D (with Z offset / mid-air):
+run('MATLAB/Image2Path_with_offset.m')
+% → outputs: trajectory.csv  [t, θ1..θ6, output]
+```
+
+> To use your own image: replace `input_image.png` in the `MATLAB/` folder and adjust the `target_width` scale parameter inside `Image2Coordinates.m`.
+
+### 2 — Copy the CSV to the ROS2 Workspace
+
+```bash
+cp MATLAB/trajectory.csv ws_robot/src/py_joint_pub/py_joint_pub/resource/
+```
+
+### 3 — Build and Run the ROS2 Node
+
+```bash
+cd ws_robot
+colcon build --symlink-install
+source install/setup.bash
+
+ros2 run py_joint_pub joint_publisher_csv
+```
+
+The node will begin publishing joint states at **500 Hz** to `/joint_states`. The robot arm will execute the trajectory and loop continuously. The `output` column in the CSV drives the LED/tool on or off per segment.
+
+### 4 — Verify (Optional)
+
+```bash
+# Monitor joint states in real-time
+ros2 topic echo /joint_states
+
+# Check publish rate
+ros2 topic hz /joint_states
+```
+
+---
+
 ## System Architecture
+
+<details>
+<summary>Click to expand architecture diagram</summary>
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -89,6 +172,8 @@ The system:
 │  → Robot arm executes trajectory in real-time                    │
 └──────────────────────────────────────────────────────────────────┘
 ```
+
+</details>
 
 ---
 
@@ -224,6 +309,26 @@ ros2 run py_joint_pub joint_publisher_csv
 **CSV format:** `[t, θ1, θ2, θ3, θ4, θ5, θ6, output]`
 
 The node publishes to `/joint_states` at 500 Hz and loops the trajectory continuously. The `output` column can be routed to any digital I/O topic for hardware tool control (pen, LED, gripper trigger, etc.).
+
+---
+
+## Results
+
+### What Worked
+
+- **Accurate trajectory reproduction**: The IK pipeline successfully converged for the full "PGery" signature trajectory with sub-millimeter FK re-validation error across all timesteps.
+- **Smooth motion**: Trapezoidal velocity profiling produced visually smooth, jerk-minimized motion — no abrupt starts or stops observed during hardware execution.
+- **LED synchronization**: The binary output vector correctly toggled the LED on/off at path segment boundaries, producing clean light traces with no bleed between strokes.
+- **Long-exposure capture**: The LED end-effector approach proved highly effective for visualizing the 3D trajectory — the glowing projections matched the intended signature shape closely.
+- **Pipeline generality**: The image-to-trajectory pipeline worked on multiple test inputs (logos, signatures, geometric shapes) without code changes.
+
+### Known Limitations
+
+- **Singularity sensitivity**: Certain input paths route the arm near kinematic singularities (det(J) ≈ 0), causing IK instability. Current mitigation is post-hoc monitoring via Jacobian determinant plots; active singularity avoidance is not yet implemented.
+- **Planar constraint**: The primary pipeline operates in a fixed Z plane. True 3D surface following (curved surfaces, varying Z per-point) requires manual `drawing_offset` tuning per trajectory.
+- **No collision avoidance**: The trajectory planner has no awareness of obstacles or self-collision; safe workspace bounds must be enforced manually via the input image scale and offset parameters.
+- **Loop-only execution**: The ROS2 node loops the trajectory indefinitely with no single-shot or conditional stop mode currently exposed.
+- **Camera-robot calibration**: Long-exposure results depend on precise camera placement and exposure settings; a formal extrinsic calibration between robot frame and camera was not implemented.
 
 ---
 
