@@ -47,14 +47,14 @@ The robot arm traces a custom signature in 3D space with an LED end-effector. Th
 
 ### Live Execution
 
-![Demo GIF](demo.gif)
+![Demo GIF](figures/demo.gif)
 
 ### Long-Exposure Light Projections
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/0b7f7970-f63b-44d8-a445-03f283068bc2" width="48%" alt="3D Light Projection — circular logo"/>
+  <img src="figures/projection_Logo.jpeg" width="48%" alt="3D Light Projection — circular logo"/>
   &nbsp;
-  <img src="https://github.com/user-attachments/assets/c37b4a65-cec6-4e4c-952a-15d80a2b6adb" width="48%" alt="3D Light Projection — script signature"/>
+  <img src="figures/projection_signature.jpeg" width="48%" alt="3D Light Projection — script signature"/>
 </p>
 
 > Long-exposure captures of the LED end-effector tracing the "PGery" signature trajectory in mid-air.
